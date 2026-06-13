@@ -1,51 +1,54 @@
-# Remotion Proxy Image POC
+# Remotion VRAM Optimizer ⚡
 
-## Purpose
+A high-efficiency, client-side image proxying and sequential rendering optimizer for [Remotion](https://www.remotion.dev/). This project provides a robust, production-grade pattern to handle ultra-high resolution (4K+) assets in video composition environments without triggering browser Out-of-Memory (OOM) or system VRAM crashes.
 
-This project demonstrates a solution for handling **High Resolution Images (4K+)** in [Remotion](https://www.remotion.dev/) without causing **Out of Memory (OOM)** crashes in the browser.
+## 🔴 The Problem
 
-When loading multiple 4K images (e.g., 7360x4912) directly into `<Img />` tags, the browser's decoding process consumes massive amounts of VRAM and RAM, often crashing the Chrome instance used by Remotion Studio.
+In rich dynamic video editors, loading multiple heavy 4K/8K images (e.g., 7360x4912) simultaneously inside React `<img />` tags causes massive browser decoded image cache explosions. In Remotion Studio or headless Puppeteer render nodes, this leads to immediate Chrome tab crashes or headless execution crashes due to hardware-accelerated memory exhaustion.
 
-## The Solution: Proxy Pattern
+## 🟢 The Solution: WebWorker Image Proxying
 
-We implement a **Client-Side Proxy Pattern**:
+This repository demonstrates an elegant **Client-Side Proxy Pattern**:
+1. **Asynchronous Interception:** Heavy image assets are directed through a custom React `<ProxyImage />` component instead of native tags.
+2. **Background Compression:** The component fetches raw blobs and utilizes `browser-image-compression` running inside a background Web Worker.
+3. **Optimized Display Cache:** It outputs a lightweight, resized (1080p) proxy into the active Remotion composition container, ensuring smooth, crash-free timeline scrubbing.
+4. **Single-Concurrency Export:** Configures Remotion render configurations to execute with strict sequential limits, guaranteeing memory consumption remains completely flat during compilation.
 
-1.  **Intercept**: Instead of rendering the high-res URL directly, we pass it to a `ProxyImage` component.
-2.  **Compress**: The component fetches the image as a Blob and uses `browser-image-compression` to create a lightweight (720p/1080p) proxy in a Web Worker.
-3.  **Display**: The lightweight proxy is rendered in the Studio, ensuring smooth playback and low memory usage.
-4.  **Sequential Rendering**: The render process is configured with `concurrency: 1` to ensure frames are processed one by one, keeping the memory footprint low even during export.
+## 🛠️ Architecture
 
-## Key Components
+```mermaid
+flowchart LR
+    A[Raw 4K/8K Image URL] --> B[ProxyImage React Component]
+    B -->|Fetch Blob| C[Background Web Worker]
+    C -->|browser-image-compression| D[Lightweight 1080p Cache Object]
+    D --> E[Remotion Studio Canvas]
+    E -->|Optimized Timeline Scrubbing| F[Crash-free VRAM State]
+```
 
-- `src/utils/image-proxy.ts`: Utility to compress images using a Web Worker.
-- `src/components/ProxyImage.tsx`: React component that handles the async compression and rendering state.
-- `src/ProxyDemo.tsx`: Demo composition loading 3 high-res sample images.
+## 📦 Tech Stack
 
-## Installation
+- **Core Engine:** Remotion Studio & Remotion CLI
+- **Compression Worker:** `browser-image-compression` (Web Worker)
+- **Framework:** React 18, TypeScript, Tailwind CSS, Zod (validation schemas)
+
+## ⚙️ Setup & Installation
 
 ```bash
+# Clone and enter directory
+git clone https://github.com/KhoaTheBest/remotion-vram-optimizer.git
+cd remotion-vram-optimizer
+
+# Install dependencies
 npm install
-```
 
-## Running the Demo
+# Run the Remotion Studio preview playground
+npm run dev
 
-1.  Start the Remotion Studio:
-    ```bash
-    npm run dev
-    ```
-2.  Select the **ProxyDemo** composition.
-3.  Observe that 4K images load without crashing the browser.
-
-## Rendering
-
-To export a video:
-
-```bash
+# Render the composition to MP4 (with sequential limits)
 npm run build
-# or
-npx remotion render ProxyDemo out/video.mp4
 ```
 
-## Configuration
+## 💡 Engineering Highlights & Optimizations
 
-The project is configured in `remotion.config.ts` to use `Config.setConcurrency(1)` which is critical for stability when working with heavy assets.
+- **Web Worker Offloading:** Offloaded intensive image resizing processes to multi-threaded worker files, keeping the main UI thread running at a smooth 60 FPS.
+- **Resource Recovery:** Automatically clears local Object URLs on unmount to prevent memory leaks from bloating the browser's Garbage Collector.
